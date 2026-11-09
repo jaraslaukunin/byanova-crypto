@@ -28,6 +28,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
       - name: Run tests
+        run: go test -count=1 ./...
+      - name: Run race detector
+        if: runner.os == 'Linux'
         run: go test -race -count=1 ./...
       - name: Run vet
         run: go vet ./...
