@@ -3,7 +3,7 @@ set -eu
 
 REPO="https://github.com/jaraslaukunin/byanova-crypto"
 BRANCH="main"
-BIN_DIR="$\{HOME}/.local/bin"
+BIN_DIR="${HOME}/.local/bin"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
 
@@ -43,11 +43,11 @@ printf '  Compiling for %s/%s...\n' "$(go env GOOS)" "$(go env GOARCH)"
 
 install -m 0755 "$TMP_DIR/bycr" "$BIN_DIR/bycr"
 
-SHELL_NAME="$(basename "$\{SHELL:-sh}")"
+SHELL_NAME="$(basename "${SHELL:-sh}")"
 PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 case "$SHELL_NAME" in
   fish)
-    CONFIG_DIR="$\{XDG_CONFIG_HOME:-$HOME/.config}/fish"
+    CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/fish"
     mkdir -p "$CONFIG_DIR"
     CONFIG_FILE="$CONFIG_DIR/config.fish"
     FISH_LINE='fish_add_path "$HOME/.local/bin"'
