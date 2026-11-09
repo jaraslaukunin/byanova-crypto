@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"bufio"
+	"strings"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/hkdf"
@@ -23,9 +25,10 @@ const (
 )
 
 func main() {
-	if len(os.Args) < 2 { usage(); os.Exit(2) }
+	if len(os.Args) < 2 { if err := runConsole(); err != nil { fmt.Fprintln(os.Stderr, "bycr:", err); os.Exit(1) }; return }
 	var err error
 	switch os.Args[1] {
+	case "console", "shell": err = runConsole()
 	case "keygen": err = runKeygen(os.Args[2:])
 	case "encrypt": err = runEncrypt(os.Args[2:])
 	case "decrypt": err = runDecrypt(os.Args[2:])
@@ -36,7 +39,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "BYANOVA — experimental file encryption\n\nUsage:\n  byanova keygen [-private private.pem] [-public public.pem]\n  byanova encrypt -pub public.pem -in plaintext -out encrypted.bya\n  byanova decrypt -key private.pem -in encrypted.bya -out plaintext\n\nThe recipient's public key can be shared. Keep the private key secret.")
+	fmt.Fprintln(os.Stderr, "BYANOVA — experimental file encryption\n\nUsage:\n  bycr                 start interactive console\n  bycr keygen [-private private.pem] [-public public.pem]\n  bycr encrypt -pub public.pem -in plaintext -out encrypted.bya\n  bycr decrypt -key private.pem -in encrypted.bya -out plaintext\n\nThe recipient's public key can be shared. Keep the private key secret.")
 }
 
 func runKeygen(args []string) error {
@@ -172,4 +175,79 @@ func writeNewFile(path string, data []byte, mode os.FileMode) error {
 	if err := f.Sync(); err != nil { _ = f.Close(); _ = os.Remove(path); return fmt.Errorf("sync %s: %w", path, err) }
 	if err := f.Close(); err != nil { _ = os.Remove(path); return fmt.Errorf("close %s: %w", path, err) }
 	return nil
+}
+
+
+const (
+	ansiReset = "\x1b[0m"
+	ansiCyan = "\x1b[36m"
+	ansiGreen = "\x1b[32m"
+	ansiYellow = "\x1b[33m"
+	ansiRed = "\x1b[31m"
+	ansiBold = "\x1b[1m"
+)
+
+func runConsole() error {
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Buffer(make([]byte, 4096), 1024*1024)
+	printBanner()
+	for {
+		fmt.Printf("%sbycr>%s ", ansiGreen+ansiBold, ansiReset)
+		if !scanner.Scan() { fmt.Println(); return scanner.Err() }
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" { continue }
+		fields := strings.Fields(line)
+		command := strings.ToLower(fields[0])
+		args := fields[1:]
+		switch command {
+		case "exit", "quit", "выход":
+			fmt.Println(ansiCyan + "BYANOVA session closed. Stay safe." + ansiReset)
+			return nil
+		case "clear", "cls":
+			fmt.Print("\033[2J\033[H")
+			printBanner()
+		case "help", "?", "помощь":
+			printHelp()
+		case "version":
+			fmt.Println("BYANOVA-CRYPTO v1 · file format BYANOVA1 · experimental")
+		case "keygen":
+			if err := runKeygen(args); err != nil { printConsoleError(err) }
+		case "encrypt":
+			if err := runEncrypt(args); err != nil { printConsoleError(err) }
+		case "decrypt":
+			if err := runDecrypt(args); err != nil { printConsoleError(err) }
+		default:
+			fmt.Printf("%sUnknown command:%s %s — type %shelp%s\n", ansiRed, ansiReset, fields[0], ansiCyan, ansiReset)
+		}
+	}
+}
+
+func printBanner() {
+	fmt.Println()
+	fmt.Printf("%s%s╭──────────────────────────────────────────────╮%s\n", ansiCyan, ansiBold, ansiReset)
+	fmt.Printf("%s%s│           BYANOVA  /  CRYPTO CONSOLE         │%s\n", ansiCyan, ansiBold, ansiReset)
+	fmt.Printf("%s%s╰──────────────────────────────────────────────╯%s\n", ansiCyan, ansiBold, ansiReset)
+	fmt.Printf("  %sSecure tools. Simple commands. v1%s\n", ansiYellow, ansiReset)
+	fmt.Printf("  Type %shelp%s to see commands, %sexit%s to quit.\n\n", ansiGreen, ansiReset, ansiGreen, ansiReset)
+}
+
+func printHelp() {
+	fmt.Println()
+	fmt.Printf("%sAVAILABLE COMMANDS%s\n", ansiBold, ansiReset)
+	fmt.Printf("  %skeygen%s   [ -private FILE ] [ -public FILE ]   Generate X25519 keys\n", ansiGreen, ansiReset)
+	fmt.Printf("  %sencrypt%s  -pub FILE -in FILE -out FILE          Encrypt a file\n", ansiGreen, ansiReset)
+	fmt.Printf("  %sdecrypt%s  -key FILE -in FILE -out FILE          Decrypt a file\n", ansiGreen, ansiReset)
+	fmt.Printf("  %sversion%s                                      Show version\n", ansiGreen, ansiReset)
+	fmt.Printf("  %sclear%s                                        Clear the screen\n", ansiGreen, ansiReset)
+	fmt.Printf("  %shelp%s                                         Show this help\n", ansiGreen, ansiReset)
+	fmt.Printf("  %sexit%s                                         Close the console\n\n", ansiGreen, ansiReset)
+	fmt.Println("Examples:")
+	fmt.Println("  keygen")
+	fmt.Println("  encrypt -pub byanova_public.pem -in notes.txt -out notes.bya")
+	fmt.Println("  decrypt -key byanova_private.pem -in notes.bya -out notes-restored.txt")
+	fmt.Printf("\n%sSecurity:%s experimental, unaudited software. See the README.\n\n", ansiYellow, ansiReset)
+}
+
+func printConsoleError(err error) {
+	fmt.Printf("%s✗ %v%s\n", ansiRed, err, ansiReset)
 }
